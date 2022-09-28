@@ -1,3 +1,8 @@
+# How to use
+```powershell
+git clone git@github.com:gyao15/pretrain.git
+```
+
 # TransFusion repository
 
 PyTorch implementation of TransFusion for CVPR'2022 paper ["TransFusion: Robust LiDAR-Camera Fusion for 3D Object Detection with Transformers"](https://arxiv.org/abs/2203.11496), by Xuyang Bai, Zeyu Hu, Xinge Zhu, Qingqiu Huang, Yilun Chen, Hongbo Fu and Chiew-Lan Tai.
