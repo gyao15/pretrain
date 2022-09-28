@@ -1,0 +1,5 @@
+v2 origin
+v4 only loss_p
+v5 loss_p + loss_q
+v6  kl_loss + loss_q
+v7 gp + loss_p + loss_q
