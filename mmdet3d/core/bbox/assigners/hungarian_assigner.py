@@ -45,6 +45,15 @@ class IoU3DCost(object):
         iou_cost = - iou
         return iou_cost * self.weight
 
+@MATCH_COST.register_module()
+class KLCost(object):
+    def __init__(self, weight):
+        self.weight = weight
+    
+    def __call__(self, p, q):
+        kl_cost = (p.unsqueeze(-1) - q.unsqueeze(1)) * torch.log(p.unsqueeze(-1) / (q.unsqueeze(1) + 1e-6) + 1e-3)
+        kl_cost = kl_cost.sum(dim=0)
+        return kl_cost * self.weight
 
 @BBOX_ASSIGNERS.register_module()
 class HeuristicAssigner3D(BaseAssigner):
@@ -104,6 +113,8 @@ class HungarianAssigner3D(BaseAssigner):
 
     def assign(self, bboxes, gt_bboxes, gt_labels, cls_pred, train_cfg):
         num_gts, num_bboxes = gt_bboxes.size(0), bboxes.size(0)
+        #print(bboxes)
+        #print(cls_pred)
 
         # 1. assign -1 by default
         assigned_gt_inds = bboxes.new_full((num_bboxes,),
@@ -152,3 +163,58 @@ class HungarianAssigner3D(BaseAssigner):
         # max_overlaps = iou.max(1).values
         return AssignResult(
             num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+
+
+@BBOX_ASSIGNERS.register_module()
+class HungarianAssigner3D_v2(BaseAssigner):
+    def __init__(self,
+                 cls_cost=dict(type='KLCost', weight=1.),
+                 reg_cost=dict(type='BBoxBEVL1Cost', weight=1.0),
+                 iou_cost=dict(type='IoU3DCost', weight=1.0),
+                 iou_calculator=dict(type='BboxOverlaps3D')
+                 ):
+        self.cls_cost = build_match_cost(cls_cost)
+        self.reg_cost = build_match_cost(reg_cost)
+        self.iou_cost = build_match_cost(iou_cost)
+        self.iou_calculator = build_iou_calculator(iou_calculator)
+
+    def assign(self, bboxes, gt_bboxes, gt_labels, cls_pred, train_cfg):
+        num_gts, num_bboxes = gt_bboxes.size(0), bboxes.size(0)
+        #print(bboxes)
+        #print(cls_pred)
+
+        # 1. assign -1 by default
+        assigned_gt_inds = bboxes.new_full((num_bboxes,),
+                                           -1,
+                                           dtype=torch.long)
+
+        # 2. compute the weighted costs
+        # see mmdetection/mmdet/core/bbox/match_costs/match_cost.py
+        cls_cost = self.cls_cost(cls_pred, gt_labels)
+        reg_cost = self.reg_cost(bboxes, gt_bboxes, train_cfg)
+        iou = self.iou_calculator(bboxes, gt_bboxes)
+        iou_cost = self.iou_cost(iou)
+        #print(cls_cost, cls_pred[0].T)
+
+        # weighted sum of above three costs
+        cost = cls_cost + reg_cost + iou_cost
+
+        # 3. do Hungarian matching on CPU using linear_sum_assignment
+        cost = cost.detach().cpu()
+        if linear_sum_assignment is None:
+            raise ImportError('Please run "pip install scipy" '
+                              'to install scipy first.')
+        matched_row_inds, matched_col_inds = linear_sum_assignment(cost)
+        matched_row_inds = torch.from_numpy(matched_row_inds).to(bboxes.device)
+        matched_col_inds = torch.from_numpy(matched_col_inds).to(bboxes.device)
+
+        # 4. assign backgrounds and foregrounds
+        # assign all indices to backgrounds first
+        # assigned_gt_inds[:] = 0
+        # assign foregrounds based on matching results
+        assigned_gt_inds[matched_row_inds] = matched_col_inds
+
+        max_overlaps = torch.zeros_like(iou.max(1).values)
+        max_overlaps[matched_row_inds] = iou[matched_row_inds, matched_col_inds]
+        # max_overlaps = iou.max(1).values
+        return assigned_gt_inds, max_overlaps

@@ -1,11 +1,34 @@
 import mmcv
 import numpy as np
 import copy
+import math
 
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations
+from mmcv.parallel import DataContainer as DC
+import torch
 
+@PIPELINES.register_module()
+class GenerateMask(object):
+    def __init__(self, input_size, mask_ratio):
+        if not isinstance(input_size, tuple):
+            input_size = (input_size,) * 2
+
+        self.height, self.width = input_size
+
+        self.num_patches = self.height * self.width
+        self.num_mask = int(mask_ratio * self.num_patches)
+
+    def __call__(self, results):
+        mask = np.hstack([
+            np.zeros(self.num_patches - self.num_mask),
+            np.ones(self.num_mask),
+        ])
+        np.random.shuffle(mask)
+        results['mask'] = DC(torch.from_numpy(mask), stack=True, pad_dims=None)
+        return results
+        
 
 @PIPELINES.register_module()
 class MyResize(object):

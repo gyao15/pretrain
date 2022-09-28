@@ -6,7 +6,7 @@ voxel_size = [0.1, 0.1, 0.2]
 out_size_factor = 8
 evaluation = dict(interval=1, out_dir='./work_dirs/transfusion_once_voxel_L_v2/eval_results')
 dataset_type = 'OnceDataset'
-data_root = '/data3/dn/Datasets/once/'
+data_root = 'data/once/'
 input_modality = dict(
     use_lidar=True,
     use_camera=False,
@@ -24,7 +24,7 @@ train_pipeline = [
     dict(
         type='ObjectSample',
         db_sampler=dict(
-            data_root='/data3/dn/Datasets/once/',
+            data_root='data/once/',
             info_path=data_root + 'once_dbinfos_train.pkl',
             rate=1.0,
             prepare=dict(
@@ -92,7 +92,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=2,
     workers_per_gpu=6,
     train=dict(
         type='CBGSDataset',
@@ -240,6 +240,6 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
 load_from = None
-resume_from = None
+resume_from = 'work_dirs/transfusion_once_voxel_L_v2/latest.pth'
 workflow = [('train', 1)]
 gpu_ids = range(1, 6)

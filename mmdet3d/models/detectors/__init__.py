@@ -11,6 +11,7 @@ from .votenet import VoteNet
 from .voxelnet import VoxelNet
 from .transfusion import TransFusionDetector
 from .bevfusion import BEVFusionDetector, BEVFusionDetectorv2
+from .pretrain_vit import PretrainVisionTransformer
 
 __all__ = [
     'Base3DDetector',
@@ -27,5 +28,6 @@ __all__ = [
     'ImVoteNet',
     'TransFusionDetector',
     'BEVFusionDetector',
-    'BEVFusionDetectorv2'
+    'BEVFusionDetectorv2',
+    'PretrainVisionTransformer'
 ]

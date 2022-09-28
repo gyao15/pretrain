@@ -6,8 +6,9 @@ from .pointnet2_sa_ssg import PointNet2SASSG
 from .second import SECOND
 from .DLA import DLASeg
 from .self_calibrated import SCNet
+from .vit import PretrainVisionTransformer, VisionTransformer
 
 __all__ = [
     'ResNet', 'ResNetV1d', 'ResNeXt', 'SSDVGG', 'HRNet', 'NoStemRegNet',
-    'SECOND', 'PointNet2SASSG', 'PointNet2SAMSG', 'MultiBackbone', 'DLASeg', 'SCNet'
+    'SECOND', 'PointNet2SASSG', 'PointNet2SAMSG', 'MultiBackbone', 'DLASeg', 'SCNet', 'PretrainVisionTransformer', 'VisionTransformer'
 ]

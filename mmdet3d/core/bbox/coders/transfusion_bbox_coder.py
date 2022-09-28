@@ -36,7 +36,7 @@ class TransFusionBBoxCoder(BaseBBoxCoder):
             targets[:, 8:10] = dst_boxes[:, 7:]
         return targets
 
-    def decode(self, heatmap, rot, dim, center, height, vel, filter=False):
+    def decode(self, heatmap, rot, dim, center, height, vel, filter=False, return_mask=False):
         """Decode bboxes.
 
         Args:
@@ -123,4 +123,6 @@ class TransFusionBBoxCoder(BaseBBoxCoder):
                 'Need to reorganize output as a batch, only '
                 'support post_center_range is not None for now!')
 
+        if return_mask:
+            return predictions_dicts, mask&thresh_mask
         return predictions_dicts

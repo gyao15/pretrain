@@ -15,6 +15,7 @@ from .scannet_dataset import ScanNetDataset
 from .semantickitti_dataset import SemanticKITTIDataset
 from .sunrgbd_dataset import SUNRGBDDataset
 from .waymo_dataset import WaymoDataset
+from .once_img_dataset import OnceImageDataset
 
 __all__ = [
     'KittiDataset', 'GroupSampler', 'DistributedGroupSampler',
@@ -25,5 +26,5 @@ __all__ = [
     'LoadPointsFromFile', 'NormalizePointsColor', 'IndoorPointSample',
     'LoadAnnotations3D', 'SUNRGBDDataset', 'ScanNetDataset',
     'SemanticKITTIDataset', 'Custom3DDataset', 'LoadPointsFromMultiSweeps',
-    'WaymoDataset', 'BackgroundPointsFilter', 'VoxelBasedPointSampler', 'OnceDataset',
+    'WaymoDataset', 'BackgroundPointsFilter', 'VoxelBasedPointSampler', 'OnceDataset', 'OnceImageDataset'
 ]

@@ -38,7 +38,9 @@ class MVXTwoStageDetector(Base3DDetector):
                  pretrained=None,
                  use_raw_points=False,
                  store=False,
-                 store_box=False):
+                 store_box=False,
+                 use_gt=False,
+                 geometry_cfg=None):
         super(MVXTwoStageDetector, self).__init__()
 
         self.freeze_img = freeze_img
@@ -78,6 +80,7 @@ class MVXTwoStageDetector(Base3DDetector):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         self.use_raw_points = use_raw_points
+        self.geometry_cfg = geometry_cfg
         self.init_weights(pretrained=pretrained)
 
     def init_weights(self, pretrained=None):

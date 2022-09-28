@@ -6,6 +6,7 @@ import mmcv
 from mmcv.cnn import ConvModule, build_conv_layer, kaiming_init
 from mmcv.runner import force_fp32
 from torch import nn
+import os
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.nn import Linear
@@ -872,6 +873,12 @@ class TransFusionHead(nn.Module):
             query_feat = lidar_feat_flatten.gather(index=top_proposals_index[:, None, :].expand(-1, lidar_feat_flatten.shape[1], -1), dim=-1)
             self.query_labels = top_proposals_class
 
+            feature_dict = None
+            if not self.training and self.test_cfg.get('store_feature', False):
+                feature_dict = {}
+                feature_dict['features'] = copy.deepcopy(query_feat.detach())
+                feature_dict['bev_feature'] = copy.deepcopy(lidar_feat.detach())
+
             # add category embedding
             one_hot = F.one_hot(top_proposals_class, num_classes=self.num_classes).permute(0, 2, 1)
             query_cat_encoding = self.class_encoding(one_hot.float())
@@ -898,9 +905,8 @@ class TransFusionHead(nn.Module):
             res_layer['center'] = res_layer['center'] + query_pos.permute(0, 2, 1)
             first_res_layer = res_layer
             if not self.fuse_img:
-                if not self.training and self.test_cfg.get('store_feature', False):
-                    res_layer['features'] = query_feat
-                    res_layer['bev_feature'] = lidar_feat
+                if feature_dict is not None:
+                    res_layer.update(feature_dict)
                 ret_dicts.append(res_layer)
 
             # for next level positional embedding

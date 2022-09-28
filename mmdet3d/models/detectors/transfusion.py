@@ -26,6 +26,7 @@ class TransFusionDetector(MVXTwoStageDetector):
         self.init_weights(pretrained=kwargs.get('pretrained', None))
         self.store = kwargs.get('store', False)
         self.store_box = kwargs.get('store_box', False)
+        self.use_gt = kwargs.get('use_gt', False)
 
     def init_weights(self, pretrained=None):
         """Initialize model weights."""
@@ -176,7 +177,10 @@ class TransFusionDetector(MVXTwoStageDetector):
         Returns:
             dict: Losses of each branch.
         """
-        outs = self.pts_bbox_head(pts_feats, img_feats, img_metas)
+        if self.use_gt:
+            outs = self.pts_bbox_head(pts_feats, img_feats, img_metas, gt_bboxes_3d, gt_labels_3d)
+        else:
+            outs = self.pts_bbox_head(pts_feats, img_feats, img_metas)
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)
         return losses

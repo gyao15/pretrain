@@ -12,7 +12,7 @@ from mmdet.datasets import DATASETS
 from ..core import show_result
 from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
 from .custom_3d import Custom3DDataset
-from .once_eval_utils import get_evaluation_results
+from .once_eval_utils import get_evaluation_results, compute_split_parts, compute_iou3d
 
 @DATASETS.register_module()
 class OnceDataset(Custom3DDataset):
@@ -153,11 +153,105 @@ class OnceDataset(Custom3DDataset):
             gt_anno = {'name': info['gt_names'], 'boxes_3d': gt_boxes}
             gt_annos.append(gt_anno)
         det_annos = self._format_bbox(results, out_dir)
+        #dump_features(gt_annos, det_annos, out_dir)
         ap_result_str, ap_dict = get_evaluation_results(gt_annos, det_annos, self.CLASSES)
         if out_dir is not None:
             ap_path = osp.join(out_dir, 'eval_once.json')
             mmcv.dump(ap_dict, ap_path)
         return ap_result_str
+
+def dump_features(gt_annos, results, out_dir):
+    iou_threshold_dict = {
+        'Car': 0.7,
+        'Bus': 0.7,
+        'Truck': 0.7,
+        'Pedestrian': 0.3,
+        'Cyclist': 0.5
+    }
+    num_samples = len(gt_annos)
+    num_parts = 100
+    split_parts = compute_split_parts(num_samples, num_parts)
+    ious = compute_iou3d(gt_annos, results, split_parts, with_heading=True)
+    classes = ['Car', 'Truck', 'Bus', 'Cyclist', 'Pedestrian']
+    pred_ious = []
+    pred_dists = []
+    pred_features = []
+    pred_scores = []
+    pred_names = []
+    for sample_idx in mmcv.track_iter_progress(range(num_samples)):
+        gt_anno = gt_annos[sample_idx]
+        pred_anno = results[sample_idx]
+        iou = ious[sample_idx]
+        pred_box3d = pred_anno['boxes_3d']
+        score = pred_anno['score']
+        pred_name = pred_anno['name']
+        
+        gt_name = gt_anno['name']
+        num_gt = iou.shape[0]
+        num_pred = iou.shape[1]
+        #missing_gt_idx = np.ones((num_gt,))
+        pred_iou = []
+        for j in range(num_pred):
+            max_iou = -1
+            max_idx = -1
+            for i in range(num_gt):
+                if pred_name[j] != gt_name[i]:
+                    continue
+                if iou[i, j] > max_iou:
+                    max_iou = iou[i, j]
+                    max_idx = i
+            #if max_iou > iou_threshold_dict[pred_name[j]]:
+                #missing_gt_idx[max_idx] = 0
+            if max_iou < 0:
+                max_iou = 0
+            pred_iou.append(max_iou)
+        pred_iou = np.array(pred_iou)
+        pred_ious.append(pred_iou)
+        pred_dists.append(np.linalg.norm(pred_box3d[:, :2], axis=-1))
+        pred_scores.append(score)
+        pred_features.append(pred_anno['features'])
+        pred_names.append(pred_name)
+        d = pred_anno['features'].shape[-1]
+    
+    pred_ious = np.concatenate(pred_ious, axis=0)
+    pred_dists = np.concatenate(pred_dists, axis=0)
+    pred_scores = np.concatenate(pred_scores, axis=0)
+    pred_features = np.concatenate(pred_features, axis=0)
+    pred_names = np.concatenate(pred_names, axis=0)
+
+    m = np.zeros((len(classes), 3, 3, d))
+    var = np.zeros((len(classes), 3, 3, d))
+    for i, c in enumerate(classes):
+        cls_mask = (pred_names == c)
+        mask = (pred_dists <= 30) & cls_mask
+        near_m, near_var = cal_statistic_iou(pred_features, pred_scores, pred_ious, mask, iou_threshold_dict[c])
+        mask = (pred_dists > 25) & (pred_dists <= 55) & cls_mask
+        mid_m, mid_var = cal_statistic_iou(pred_features, pred_scores, pred_ious, mask, iou_threshold_dict[c])
+        mask = (pred_dists >60) & cls_mask
+        far_m, far_var = cal_statistic_iou(pred_features, pred_scores, pred_ious, mask, iou_threshold_dict[c])
+        m[i] = np.stack([near_m, mid_m, far_m], axis=0)
+        var[i] = np.stack([near_var, mid_var, far_var], axis=0)
+
+    res_path = osp.join(out_dir, 'mean.pkl')
+    mmcv.dump([m], res_path)
+    res_path = osp.join(out_dir, 'var.pkl')
+    mmcv.dump([var], res_path)
+
+def get_mv(feature, score):
+    m = np.sum(feature * score[:, np.newaxis], axis=0) / score.sum()
+    v = np.sum(score[:, np.newaxis] * (feature - m)**2, axis=0) / score.sum()
+    return m, v
+
+def cal_statistic_iou(features, scores, ious, mask, threshold, iou_weight=True):
+    pos_mask = mask & (ious >= threshold)
+    in_mask = mask & (ious < threshold) & (ious > 0)
+    fp_mask = mask & (ious <= 0)
+    new_scores = np.sqrt(scores * ious) if iou_weight else scores
+    pos_m, pos_var = get_mv(features[pos_mask], new_scores[pos_mask])
+    in_m, in_var = get_mv(features[in_mask], new_scores[in_mask])
+    fp_m, fp_var = get_mv(features[fp_mask], 1 - scores[fp_mask])
+    return np.stack([pos_m, in_m, fp_m], axis=0), np.stack([pos_var, in_var, fp_var], axis=0)
+
 
 def output_to_once_box(detection, mapped_class_names, score_thr=0.001):
     box3d = detection['boxes_3d']
